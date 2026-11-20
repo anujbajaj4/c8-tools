@@ -1,7 +1,7 @@
 """Part 2: the same tool on the sheet's side, as an MCP server.  Run: python mcp_server.py
 The steps are in README.md."""
 import csv, io, os, socket
-from typing import Annotated
+from typing import Annotated, Literal
 import requests
 from fastmcp import FastMCP
 
@@ -22,17 +22,33 @@ def get_lecture(
     return {"error": f"There is no lecture {number}. Lectures run from 1 to 19."}
 
 
-# My own data: my reading list, a CSV file next to this one.
-BOOKS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "books.csv")
+# My own data.
+# Live numbers for my own GitHub projects, mainly wificonnector (my Mac app for VIT hostel Wi-Fi login).
+# Stars, forks and releases come from ungh.cc, a GitHub mirror with no rate limit. Download counts only
+# exist on GitHub's own API, which allows 60 requests an hour without a login, so they can be missing.
+MY_REPOS = ["wificonnector", "c8-tools", "100x-ConcepChecker-Anuj", "100x-nailmail"]
 
 @mcp.tool
-def get_book(title: Annotated[str, "The book's title, or a distinctive part of it, e.g. 'Sapiens'."]) -> dict:
-    """Looks up one book on my personal reading list and returns its author, my status (finished, reading, want to read, abandoned), my rating out of 5, when I finished it, and my note. Use it when someone asks about my reading, my rating or my opinion of a specific book, or whether I have read it. Do not use it for general questions about books, such as who wrote a book or what it is about, or for book recommendations."""
-    with open(BOOKS, newline="") as f:
-        for row in csv.DictReader(f):
-            if title.strip().lower() in row["title"].lower():
-                return row
-    return {"error": f"{title!r} is not on my reading list."}
+def get_app_stats(
+    repo: Annotated[Literal["wificonnector", "c8-tools", "100x-ConcepChecker-Anuj", "100x-nailmail"],
+                    "Which of my projects. Use wificonnector unless another one is named."] = "wificonnector",
+) -> dict:
+    """Gets live numbers for one of my own GitHub projects, mainly wificonnector, my Mac menu-bar app that logs in to VIT hostel Wi-Fi: stars, watchers, forks, when it was created and last updated, how many releases it has, the latest release, and total downloads. Use it when someone asks how my app or project is doing, how many people downloaded or starred it, or what its latest version is. Do not use it for other people's projects, for general questions about GitHub, or for how to use the app."""
+    if repo not in MY_REPOS:
+        return {"error": f"{repo!r} is not one of my public projects: {', '.join(MY_REPOS)}."}
+    info = requests.get(f"https://ungh.cc/repos/anujbajaj4/{repo}", timeout=10).json()["repo"]
+    releases = requests.get(f"https://ungh.cc/repos/anujbajaj4/{repo}/releases", timeout=10).json()["releases"]
+    stats = {"repo": info["repo"], "stars": info["stars"], "watchers": info["watchers"], "forks": info["forks"],
+             "created": info["createdAt"][:10], "last_push": info["pushedAt"][:10], "releases": len(releases)}
+    if releases:
+        latest = releases[0]
+        stats["latest_release"] = {"tag": latest["tag"], "name": latest["name"], "published": latest["publishedAt"][:10]}
+    gh = requests.get(f"https://api.github.com/repos/anujbajaj4/{repo}/releases", timeout=10)
+    if gh.status_code == 200:
+        stats["total_downloads"] = sum(a["download_count"] for r in gh.json() for a in r["assets"])
+    else:
+        stats["total_downloads"] = "unknown right now: GitHub's rate limit for requests without a login was hit"
+    return stats
 
 
 # Any app can now reach it at http://localhost:8000/mcp

@@ -236,20 +236,26 @@ Do it once more with data you care about: your own Google Sheet, a CSV file, a S
 2. Write its card, and five questions of your own for the table in step 6.
 3. Push, and call your new tool at the deployed address.
 
-### My own data: a reading list
+### My own data: live stats for my wificonnector app
 
-`books.csv` holds a reading list, one row per book: title, author, status, rating, date finished and a note. `get_book(title)` sits next to `get_lecture` in both files, and `tool_call.py` now sends both cards and runs whichever tool the model asks for.
+`get_app_stats(repo)` returns live numbers for my own GitHub projects, mainly [wificonnector](https://github.com/anujbajaj4/wificonnector), my Mac menu-bar app that logs in to VIT hostel Wi-Fi: stars, watchers, forks, created and last-push dates, releases, the latest release and total downloads. `repo` can only be one of my public projects (an `enum` in the card, a `Literal` on the server), so the model cannot ask for anyone else's.
+
+It sits next to `get_lecture` in both files, and `tool_call.py` sends both cards and runs whichever tool the model asks for.
+
+Where the data comes from, and what happens when it fails:
+- Stars, forks, dates and releases come from [ungh.cc](https://ungh.cc), a GitHub mirror with no rate limit.
+- Download counts exist only on GitHub's own API, which allows 60 requests an hour without a login. When GitHub refuses, the tool says so in `total_downloads` instead of failing, and the model tells the user it could not get the number rather than making one up.
 
 | Question | Should it ask for a tool? | Did it? |
 |---|---|---|
-| What rating did I give Atomic Habits? | Yes, `get_book` | Yes, `get_book {'title': 'Atomic Habits'}`: 4 out of 5 |
-| Have I finished Sapiens yet? | Yes, `get_book` | Yes, `get_book {'title': 'Sapiens'}`: still reading |
-| Who wrote War and Peace? | No, general knowledge and not on the list | No, answered on its own |
-| When is Lecture 12 of 100xEngineers Cohort 8? | Yes, but `get_lecture`, not `get_book` | Yes, `get_lecture {'number': 12}` |
-| Can you recommend a good book to learn Python? | No, a recommendation, not my list | No, answered on its own |
+| How many downloads does my wificonnector app have? | Yes, `get_app_stats` | Yes, `get_app_stats {'repo': 'wificonnector'}`. GitHub's limit was hit on my laptop, and the model said it could not get the count instead of inventing one |
+| What's the latest version of wificonnector? | Yes, `get_app_stats` | Yes: v0.4.1, published 2026-11-11 |
+| How many stars does my c8-tools repo have? | Yes, `get_app_stats` with `repo=c8-tools` | Yes, `get_app_stats {'repo': 'c8-tools'}` |
+| How many stars does the React repo have on GitHub? | No, not my project | No, answered on its own |
+| When is Lecture 12 of 100xEngineers Cohort 8? | Yes, but `get_lecture`, not `get_app_stats` | Yes, `get_lecture {'number': 12}` |
 
 ```bash
-fastmcp call https://c8-curriculum.fastmcp.app/mcp get_book title="Deep Work"
+fastmcp call https://c8-curriculum.fastmcp.app/mcp get_app_stats repo=wificonnector
 ```
 
 ## Submit it

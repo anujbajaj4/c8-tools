@@ -19,15 +19,28 @@ def get_lecture(number):
     return {"error": f"There is no lecture {number}. Lectures run from 1 to 19."}
 
 # ---------- MY OWN DATA ----------
-# My reading list, a CSV file next to this one: one row per book.
-BOOKS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "books.csv")
+# Live numbers for my own GitHub projects, mainly wificonnector (my Mac app for VIT hostel Wi-Fi login).
+# Stars, forks and releases come from ungh.cc, a GitHub mirror with no rate limit. Download counts only
+# exist on GitHub's own API, which allows 60 requests an hour without a login, so they can be missing.
+MY_REPOS = ["wificonnector", "c8-tools", "100x-ConcepChecker-Anuj", "100x-nailmail"]
 
-def get_book(title):
-    with open(BOOKS, newline="") as f:
-        for row in csv.DictReader(f):
-            if title.strip().lower() in row["title"].lower():
-                return row
-    return {"error": f"{title!r} is not on my reading list."}
+def get_app_stats(repo="wificonnector"):
+    if repo not in MY_REPOS:
+        return {"error": f"{repo!r} is not one of my public projects: {', '.join(MY_REPOS)}."}
+    info = requests.get(f"https://ungh.cc/repos/anujbajaj4/{repo}", timeout=10).json()["repo"]
+    releases = requests.get(f"https://ungh.cc/repos/anujbajaj4/{repo}/releases", timeout=10).json()["releases"]
+    stats = {"repo": info["repo"], "stars": info["stars"], "watchers": info["watchers"], "forks": info["forks"],
+             "created": info["createdAt"][:10], "last_push": info["pushedAt"][:10], "releases": len(releases)}
+    if releases:
+        latest = releases[0]
+        stats["latest_release"] = {"tag": latest["tag"], "name": latest["name"], "published": latest["publishedAt"][:10]}
+    gh = requests.get(f"https://api.github.com/repos/anujbajaj4/{repo}/releases", timeout=10)
+    if gh.status_code == 200:
+        stats["total_downloads"] = sum(a["download_count"] for r in gh.json() for a in r["assets"])
+    else:
+        stats["total_downloads"] = "unknown right now: GitHub's rate limit for requests without a login was hit"
+    return stats
+
 
 # ---------- THE MODEL (given) ----------
 # One message to Groq, one message back. Nothing is added that you do not send.
@@ -66,24 +79,24 @@ card = {"type": "function", "function": {
                    "required": ["number"]},
 }}
 
-# My own data: the card for get_book.
-book_card = {"type": "function", "function": {
-    "name": "get_book",
+# My own data: the card for get_app_stats.
+stats_card = {"type": "function", "function": {
+    "name": "get_app_stats",
     "description": (                                                      # Use it when
-        "Looks up one book on my personal reading list and returns its author, my status "
-        "(finished, reading, want to read, abandoned), my rating out of 5, when I finished it, and my note. "
-        "Use it when someone asks about my reading, my rating or my opinion of a specific book, "
-        "or whether I have read it. Do not use it for general questions about books, such as who wrote "
-        "a book or what it is about, or for book recommendations."
+        "Gets live numbers for one of my own GitHub projects, mainly wificonnector, my Mac menu-bar app "
+        "that logs in to VIT hostel Wi-Fi: stars, watchers, forks, when it was created and last updated, "
+        "how many releases it has, the latest release, and total downloads. Use it when someone asks how my "
+        "app or project is doing, how many people downloaded or starred it, or what its latest version is. "
+        "Do not use it for other people's projects, for general questions about GitHub, or for how to use the app."
     ),
     "parameters": {"type": "object",
-                   "properties": {"title": {"type": "string",                                    # It needs
-                                            "description": "The book's title, or a distinctive part of it, e.g. 'Sapiens'."}},
-                   "required": ["title"]},
+                   "properties": {"repo": {"type": "string", "enum": MY_REPOS,                   # It needs
+                                           "description": "Which of my projects. Use wificonnector unless another one is named."}},
+                   "required": ["repo"]},
 }}
 
-cards = [card, book_card]
-TOOLS = {"get_lecture": get_lecture, "get_book": get_book}               # the name the model asks for -> my function
+cards = [card, stats_card]
+TOOLS = {"get_lecture": get_lecture, "get_app_stats": get_app_stats}     # the name the model asks for -> my function
 
 # Steps 3 to 5. While the model asks for a tool, run each request (step 3),
 # hand the result back as a "tool" message (step 4), and ask again. When it stops asking, print its answer.
