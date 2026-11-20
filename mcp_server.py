@@ -1,6 +1,6 @@
 """Part 2: the same tool on the sheet's side, as an MCP server.  Run: python mcp_server.py
 The steps are in README.md."""
-import csv, io, socket
+import csv, io, os, socket
 from typing import Annotated
 import requests
 from fastmcp import FastMCP
@@ -20,6 +20,19 @@ def get_lecture(
         if row[1].startswith(f"{number}. "):
             return {"date": row[0], "title": row[1], "type": row[2], "tools": row[3]}
     return {"error": f"There is no lecture {number}. Lectures run from 1 to 19."}
+
+
+# My own data: my reading list, a CSV file next to this one.
+BOOKS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "books.csv")
+
+@mcp.tool
+def get_book(title: Annotated[str, "The book's title, or a distinctive part of it, e.g. 'Sapiens'."]) -> dict:
+    """Looks up one book on my personal reading list and returns its author, my status (finished, reading, want to read, abandoned), my rating out of 5, when I finished it, and my note. Use it when someone asks about my reading, my rating or my opinion of a specific book, or whether I have read it. Do not use it for general questions about books, such as who wrote a book or what it is about, or for book recommendations."""
+    with open(BOOKS, newline="") as f:
+        for row in csv.DictReader(f):
+            if title.strip().lower() in row["title"].lower():
+                return row
+    return {"error": f"{title!r} is not on my reading list."}
 
 
 # Any app can now reach it at http://localhost:8000/mcp

@@ -236,6 +236,22 @@ Do it once more with data you care about: your own Google Sheet, a CSV file, a S
 2. Write its card, and five questions of your own for the table in step 6.
 3. Push, and call your new tool at the deployed address.
 
+### My own data: a reading list
+
+`books.csv` holds a reading list, one row per book: title, author, status, rating, date finished and a note. `get_book(title)` sits next to `get_lecture` in both files, and `tool_call.py` now sends both cards and runs whichever tool the model asks for.
+
+| Question | Should it ask for a tool? | Did it? |
+|---|---|---|
+| What rating did I give Atomic Habits? | Yes, `get_book` | Yes, `get_book {'title': 'Atomic Habits'}`: 4 out of 5 |
+| Have I finished Sapiens yet? | Yes, `get_book` | Yes, `get_book {'title': 'Sapiens'}`: still reading |
+| Who wrote War and Peace? | No, general knowledge and not on the list | No, answered on its own |
+| When is Lecture 12 of 100xEngineers Cohort 8? | Yes, but `get_lecture`, not `get_book` | Yes, `get_lecture {'number': 12}` |
+| Can you recommend a good book to learn Python? | No, a recommendation, not my list | No, answered on its own |
+
+```bash
+fastmcp call https://c8-curriculum.fastmcp.app/mcp get_book title="Deep Work"
+```
+
 ## Submit it
 
 - The link to your fork, with the step 6 table filled in.

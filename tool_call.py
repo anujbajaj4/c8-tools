@@ -18,6 +18,17 @@ def get_lecture(number):
             return {"date": row[0], "title": row[1], "type": row[2], "tools": row[3]}
     return {"error": f"There is no lecture {number}. Lectures run from 1 to 19."}
 
+# ---------- MY OWN DATA ----------
+# My reading list, a CSV file next to this one: one row per book.
+BOOKS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "books.csv")
+
+def get_book(title):
+    with open(BOOKS, newline="") as f:
+        for row in csv.DictReader(f):
+            if title.strip().lower() in row["title"].lower():
+                return row
+    return {"error": f"{title!r} is not on my reading list."}
+
 # ---------- THE MODEL (given) ----------
 # One message to Groq, one message back. Nothing is added that you do not send.
 def ask_model(messages, tools=None):
@@ -55,17 +66,37 @@ card = {"type": "function", "function": {
                    "required": ["number"]},
 }}
 
-# Steps 3 to 5. While the model asks for the tool, run each request (step 3),
-# hand the row back as a "tool" message (step 4), and ask again. When it stops asking, print its answer.
-reply = ask_model(messages, [card])
+# My own data: the card for get_book.
+book_card = {"type": "function", "function": {
+    "name": "get_book",
+    "description": (                                                      # Use it when
+        "Looks up one book on my personal reading list and returns its author, my status "
+        "(finished, reading, want to read, abandoned), my rating out of 5, when I finished it, and my note. "
+        "Use it when someone asks about my reading, my rating or my opinion of a specific book, "
+        "or whether I have read it. Do not use it for general questions about books, such as who wrote "
+        "a book or what it is about, or for book recommendations."
+    ),
+    "parameters": {"type": "object",
+                   "properties": {"title": {"type": "string",                                    # It needs
+                                            "description": "The book's title, or a distinctive part of it, e.g. 'Sapiens'."}},
+                   "required": ["title"]},
+}}
+
+cards = [card, book_card]
+TOOLS = {"get_lecture": get_lecture, "get_book": get_book}               # the name the model asks for -> my function
+
+# Steps 3 to 5. While the model asks for a tool, run each request (step 3),
+# hand the result back as a "tool" message (step 4), and ask again. When it stops asking, print its answer.
+reply = ask_model(messages, cards)
 
 while reply.get("tool_calls"):
     messages.append(reply)                                                # the model's request
     for call in reply["tool_calls"]:
+        name = call["function"]["name"]
         args = json.loads(call["function"]["arguments"])                  # arguments arrive as text
-        print("The model asked for: get_lecture", args)
-        result = get_lecture(**args)
+        print("The model asked for:", name, args)
+        result = TOOLS[name](**args) if name in TOOLS else {"error": f"There is no tool called {name}."}
         messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
-    reply = ask_model(messages, [card])
+    reply = ask_model(messages, cards)
 
 print("\n" + reply["content"])
