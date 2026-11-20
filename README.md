@@ -137,11 +137,15 @@ The model reads only the card. First fill in the middle column. Then run each qu
 
 | Question | Should it ask for the tool? | Did it? |
 |---|---|---|
-| When is Lecture 12 of 100xEngineers Cohort 8, and what is it about? | | |
-| Which tools do we use in the seventh class? | | |
-| What is an API? | | |
-| Is session ten a combined one or separate? | | |
-| In lecture 3 of Harvard CS50, which language is taught? | | |
+| When is Lecture 12 of 100xEngineers Cohort 8, and what is it about? | Yes, `number=12` | Yes, `get_lecture {'number': 12}` (3/3 runs) |
+| Which tools do we use in the seventh class? | Yes, `number=7` | Yes, `get_lecture {'number': 7}` (3/3 runs) |
+| What is an API? | No, general knowledge | No, answered on its own (3/3 runs) |
+| Is session ten a combined one or separate? | Yes, `number=10` | Yes, `get_lecture {'number': 10}` (3/3 runs) |
+| In lecture 3 of Harvard CS50, which language is taught? | No, not a 100xEngineers lecture | No, answered on its own (3/3 runs) |
+
+What I changed in the card so every row matches: the description says when *not* to use the tool (general questions, other courses like CS50), and the `number` description says to turn words into digits ("seventh" is 7, "ten" is 10).
+
+One hallucination left, and it is not the tool call's fault: for Lecture 12 the model expands "MCP" as "Multi-Component Pipeline". The sheet never says what MCP stands for, so the model predicts it. The fix belongs in the data (a line saying MCP = Model Context Protocol), not in the card.
 
 ```bash
 python tool_call.py "Which tools do we use in the seventh class?"
